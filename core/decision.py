@@ -1,43 +1,55 @@
-from config import *
-
 class CareDecision:
     """
-    2.4 决策层：综合评分与迟滞比较器
+    ACAS 2.0 决策层
+    特性：上下文感知 (Context-Aware) 的自适应线性评分模型
     """
     def __init__(self, base_score=85):
         self.base_score = base_score
-        self.current_level = "L3" # 初始状态: 关注级
+        self.current_level = "L3"
 
-    def calculate_total_score(self, q_val, penalty):
+    def calculate_total_score(self, q_val, entropy_penalty, shock_signal, spo2_val, location):
         """
-        H_score = S_base - Beta * (1 - Q_val) - Penalty
-        注：这里简化了 Risk(Tag) 项，假设风险越高 Q_val 导致的分数扣除越多
+        增强版线性公式：
+        H_score = S_base - (w1*Shock) - (w2*Entropy) - (w3*Crowd) - (w4*SpO2_Loss)
+        其中 w 参数根据 location 动态调整
         """
-        # 如果 Q_val 很低（即 P 和 Q 差异大，或者 Q 指向风险），扣分
-        # 这里的逻辑主要体现：不确定性越高，分数越低；或者熵越高，分数越低
+        # 1. 默认权重
+        w_shock = 20.0
+        w_entropy = 1.0 # entropy_penalty 内部已经乘过系数，这里保持1
+        w_crowd = 15.0  # 基于置信度的扣分
         
-        # 修正逻辑：
-        # 如果 Q_val 接近 1 (一致)，扣分少？不对。
-        # 应该是：如果传感器显示风险(P)，且志愿者确认风险(Q)，则 Q_val 高，但因为是风险，要扣分。
-        # 此处简化仿真逻辑：仅利用熵罚分和置信度权重。
+        # 2. 上下文感知：权重自适应调整 (Context Adaptation)
+        if location == "Park":
+            # 场景：在公园运动
+            # 策略：调低熵的敏感度（允许心率波动），忽略轻微冲击
+            w_entropy = 0.3 
+            w_shock = 10.0 
         
-        trust_loss = BETA * (1.0 - q_val) # 置信度越低，扣分越多（不确定性惩罚）
+        elif location == "Bathroom":
+            # 场景：在浴室
+            # 策略：跌倒极其危险，大幅提升冲击权重
+            w_shock = 40.0 
+            
+        # 3. 计算各分项扣分
+        loss_shock = w_shock * shock_signal
+        loss_entropy = w_entropy * entropy_penalty
+        loss_crowd = w_crowd * (1.0 - q_val) # 置信度越低(风险越大)，扣分越多
         
-        score = self.base_score - trust_loss - penalty
+        # 新增：血氧扣分 (非线性急剧扣分)
+        loss_spo2 = 0
+        if spo2_val < 95:
+            loss_spo2 = (95 - spo2_val) * 2.5 # 每低1%扣2.5分
+            
+        # 4. 总分计算
+        total_loss = loss_shock + loss_entropy + loss_crowd + loss_spo2
+        score = self.base_score - total_loss
+        
         return max(0, min(100, score))
 
     def apply_hysteresis(self, score):
-        """
-        双阈值迟滞比较器
-        """
+        # 迟滞比较器保持不变
         if self.current_level == "L3":
-            # 只有分数极低时才升级到 L4 (避免误报)
-            if score < LEVEL_UP_THRESHOLD:
-                self.current_level = "L4"
-                
+            if score < 60: self.current_level = "L4"
         elif self.current_level == "L4":
-            # 只有分数显著回升时才降级回 L3 (避免反复震荡)
-            if score > LEVEL_DOWN_THRESHOLD:
-                self.current_level = "L3"
-                
+            if score > 65: self.current_level = "L3"
         return self.current_level

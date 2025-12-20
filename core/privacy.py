@@ -2,28 +2,31 @@ import numpy as np
 
 class PrivacyModule:
     """
-    2.1 隐私保护层：基于位置的 K-匿名
+    2.1 隐私保护层：K-匿名可视化支持
     """
     def __init__(self, k=5):
         self.k = k
 
-    def generalize_location(self, exact_loc, active_user_pool_size=100):
+    def get_k_anonymity_box(self, center_lat, center_lon):
         """
-        模拟 K-匿名算法。
-        实际上应该查询数据库寻找最近的k-1个用户，
-        这里为了仿真，模拟生成覆盖k个用户的矩形区域面积。
+        根据 K 值生成覆盖 K 个潜在用户的矩形框坐标
+        K 越大，矩形框越大 (模拟位置模糊化)
+        返回: [min_lon, min_lat, max_lon, max_lat]
         """
-        # 模拟周围 k-1 个随机用户的位置
-        sigma = 0.05 # 密度分布参数
-        other_users_x = np.random.normal(exact_loc[0], sigma, self.k - 1)
-        other_users_y = np.random.normal(exact_loc[1], sigma, self.k - 1)
+        # 简单模拟：K值每增加1，模糊半径增加 0.0005 度 (约50米)
+        base_radius = 0.0002
+        radius = base_radius + (self.k * 0.0002)
         
-        all_x = np.append(other_users_x, exact_loc[0])
-        all_y = np.append(other_users_y, exact_loc[1])
+        # 加入一点随机偏移，让框不总是以老人为中心（更真实的匿名）
+        offset_lat = np.random.uniform(-radius/2, radius/2)
+        offset_lon = np.random.uniform(-radius/2, radius/2)
         
-        # 计算最小覆盖矩形面积
-        width = np.max(all_x) - np.min(all_x)
-        height = np.max(all_y) - np.min(all_y)
-        area = width * height
+        sim_center_lat = center_lat + offset_lat
+        sim_center_lon = center_lon + offset_lon
         
-        return area
+        return [
+            sim_center_lon - radius, # min_lon
+            sim_center_lat - radius, # min_lat
+            sim_center_lon + radius, # max_lon
+            sim_center_lat + radius  # max_lat
+        ]
