@@ -1,104 +1,123 @@
+# simulation/generator.py
 import numpy as np
 import random
+from .actors import HolographicState
 
-class DataGenerator:
+class RealTimeSimulator:
     """
-    ACAS 2.0 数据生成器
-    新增维度: SpO2, Temperature, Semantic Location
+    全维生理信号生成器 (2.0 Enhanced)
+    支持6种医学/生活场景：Normal, Arrhythmia, Fall, Exercise, Hypoglycemia, Infarction
     """
-    def __init__(self, duration=100):
-        self.duration = duration
-
-    def generate_extended_scenario(self, scenario_type):
-        """
-        生成多源异构数据流
-        返回: (hr, spo2, temp, location_type, true_status, acc_shock)
-        """
-        steps = self.duration
-        hr_data = []
-        spo2_data = []
-        temp_data = []
-        loc_types = []   # 语义标签: Bedroom, Bathroom, Park
-        true_status = [] # 0:Normal, 1:Risk
-        acc_shock = []   # 0 or 1
+    def __init__(self):
+        self.t = 0
         
-        # 基础参数
-        base_hr = 75
-        base_spo2 = 98
-        base_temp = 26.0
-
-        if scenario_type == "SCENARIO_1_CONTEXT_FILTER":
-            # === 剧本 1: 运动干扰排除 (Park) ===
-            # 特征：心率高，但 SpO2 正常，位置在公园 -> 系统应判定为“锻炼”而非风险
-            for t in range(steps):
-                # 模拟运动心率 (110-120)
-                hr_val = 115 + np.random.normal(0, 5)
-                # 血氧正常 (运动时供氧充足)
-                spo2_val = 98 + np.random.normal(0, 1)
-                # 户外温度稍高
-                temp_val = 28.0 + np.random.normal(0, 0.5)
-                
-                hr_data.append(hr_val)
-                spo2_data.append(min(100, spo2_val))
-                temp_data.append(temp_val)
-                loc_types.append("Park") # 关键语义
-                true_status.append(0)    # 真实状态是正常的
-                acc_shock.append(0)
-
-        elif scenario_type == "SCENARIO_2_CRITICAL_FALL":
-            # === 剧本 2: 浴室跌倒危机 (Bathroom) ===
-            # 特征：浴室 + 冲击 + 血氧下降 -> 极度危险
-            for t in range(steps):
-                if t < 60:
-                    # 正常洗澡
-                    hr_data.append(85 + np.random.normal(0, 3))
-                    spo2_data.append(97 + np.random.normal(0, 1))
-                    acc_shock.append(0)
-                    status = 0
-                else:
-                    # t=60 跌倒
-                    hr_data.append(120 + np.random.normal(0, 10)) # 疼痛导致心率升
-                    spo2_data.append(88 + np.random.normal(0, 2)) # 呼吸困难，血氧降
-                    acc_shock.append(1 if t == 60 else 0)         # 瞬间冲击
-                    status = 1
-                
-                temp_data.append(35.0) # 浴室高温
-                loc_types.append("Bathroom")
-                true_status.append(status)
-
-        elif scenario_type == "SCENARIO_3_PRIVACY_TRADE":
-            # === 剧本 3: 隐私博弈 (Bedroom) ===
-            # 特征：心率波动，需要志愿者介入。用于演示调节 K 值的影响。
-            for t in range(steps):
-                # 心律不齐
-                hr_data.append(75 + np.random.normal(0, 15)) 
-                spo2_data.append(96 + np.random.normal(0, 1))
-                temp_data.append(25.0)
-                loc_types.append("Bedroom")
-                
-                # 真实确实有风险，看志愿者能否发现
-                true_status.append(1) 
-                acc_shock.append(0)
-
-        return (np.array(hr_data), np.array(spo2_data), np.array(temp_data), 
-                loc_types, np.array(true_status), np.array(acc_shock))
-
-    def generate_crowd_reports(self, true_status_code, k_val):
-        """
-        模拟志愿者反馈。
-        关键逻辑：K 值越大(隐私越强)，位置越模糊，志愿者误判率越高，响应越慢。
-        """
-        labels = []
-        status_map = {0: "Normal", 1: "Risk"}
+    def stream_generator(self, scenario_mode="Normal"):
+        # === 0. 初始化基准值 (健康态) ===
+        base_hr = 75.0
+        base_spo2 = 98.0
+        base_sys = 120.0
+        base_dia = 80.0
+        base_temp = 36.6
+        base_rr = 16.0
+        base_gsr = 2.0 # 基线皮肤电
         
-        # K值对准确率的惩罚 (K越大，志愿者越看不清，准确率下降)
-        # K=1 -> acc=0.95; K=20 -> acc=0.6
-        accuracy = max(0.6, 0.95 - (k_val * 0.015))
-        
-        for _ in range(5):
-            if random.random() < accuracy:
-                report_code = true_status_code
-            else:
-                report_code = 1 - true_status_code # 误判
-            labels.append(status_map[report_code])
-        return labels
+        while True:
+            self.t += 1
+            
+            # === 1. 生成基础波动 (高斯噪声) ===
+            curr_hr = base_hr + np.random.normal(0, 2)
+            curr_spo2 = base_spo2 + np.random.normal(0, 0.5)
+            curr_sys = base_sys + np.random.normal(0, 3)
+            curr_dia = base_dia + np.random.normal(0, 2)
+            curr_temp = base_temp + np.random.normal(0, 0.1)
+            curr_rr = base_rr + np.random.normal(0, 1)
+            curr_gsr = base_gsr + np.random.normal(0, 0.2)
+            
+            curr_shock = 0
+            curr_loc = "Bedroom" # 默认位置
+            
+            # === 2. 场景注入逻辑 (六大场景) ===
+            
+            # --- A. 基础场景 ---
+            if scenario_mode == "Arrhythmia": 
+                # [心律失常]: 心率波动大，体温微升
+                if (self.t % 40) > 20:
+                    curr_hr += np.random.normal(20, 10) # 熵增来源
+                    curr_sys += 10
+                    curr_temp += 0.4
+                curr_loc = "LivingRoom"
+                
+            elif scenario_mode == "Fall_Bathroom": 
+                # [浴室跌倒]: 冲击 -> 剧痛(GSR/BP高) -> 休克(BP低)
+                curr_loc = "Bathroom"
+                if self.t > 20:
+                    if self.t == 21: curr_shock = 1
+                    if self.t <= 30: # 剧痛期
+                        curr_hr = 125 + np.random.normal(0, 5)
+                        curr_sys = 165 + np.random.normal(0, 5)
+                        curr_gsr = 15.0 + np.random.normal(0, 2) # 痛
+                    else: # 昏迷期
+                        curr_sys = 85 + np.random.normal(0, 5) # 低血压
+                        curr_spo2 = 88 + np.random.normal(0, 2)
+            
+            # --- B. 新增高级场景 (Context-Aware) ---
+            
+            elif scenario_mode == "Exercise":
+                # [D. 高强度运动]: 假报警测试
+                # 特征: HR极高, BP高, 但 GSR低(无痛), SpO2好
+                curr_loc = "Park" # 关键上下文
+                if self.t > 10:
+                    curr_hr = 135 + np.random.normal(0, 5) # 看起来很危险
+                    curr_sys = 155 + np.random.normal(0, 5) # 运动性高血压
+                    curr_rr = 28 + np.random.normal(0, 2)   # 气喘吁吁
+                    curr_spo2 = 99.0 # 深呼吸供氧极好
+                    curr_gsr = 3.0   # 只是出汗，没有痛感尖峰
+            
+            elif scenario_mode == "Hypoglycemia":
+                # [E. 夜间低血糖]: 代谢危机
+                # 特征: 冷汗(GSR高+体温低), 心悸
+                curr_loc = "Bedroom"
+                if self.t > 15:
+                    curr_gsr = 12.0 + np.random.normal(0, 1) # 冷汗 (关键特征)
+                    curr_temp = 35.8 + np.random.normal(0, 0.1) # 体表湿冷
+                    curr_hr = 115 + np.random.normal(0, 5) # 心悸
+                    curr_sys = 110 # 血压甚至略低
+            
+            elif scenario_mode == "Infarction":
+                # [F. 急性心梗]: 最高危
+                # 特征: 濒死感(GSR极高), 休克(BP低), 缺氧
+                curr_loc = "LivingRoom"
+                if self.t > 20:
+                    curr_gsr = 25.0 + np.random.normal(0, 3) # 剧烈胸痛 (爆表)
+                    curr_sys = 80 + np.random.normal(0, 5)   # 心源性休克
+                    curr_spo2 = 91 + np.random.normal(0, 1)  # 缺氧
+                    curr_rr = 30 # 呼吸急促
+                    curr_hr = 100 + np.random.normal(0, 20) # 极度不稳定
+            
+            # === 3. 边界限制 ===
+            curr_spo2 = min(100, max(60, curr_spo2))
+            curr_gsr = max(0, curr_gsr)
+            curr_sys = max(50, curr_sys)
+            
+            # === 4. 群智感知 (志愿者) ===
+            # 志愿者更容易发现“显性风险”(如跌倒、剧烈疼痛表情)
+            crowd_labels = []
+            # 显性风险判定逻辑：有冲击 或 极度疼痛(GSR>18) 或 位于高危区且异常
+            visible_risk = (curr_shock == 1) or (curr_gsr > 18) or (curr_loc=="Bathroom" and curr_sys < 90)
+            
+            for _ in range(3):
+                if random.random() < 0.6:
+                    report = "Risk" if visible_risk else "Normal"
+                    if random.random() > 0.95: report = "Normal" if report == "Risk" else "Risk" # 误报
+                    crowd_labels.append(report)
+            
+            # === 5. 封装 ===
+            state = HolographicState(
+                base_score=95,
+                hr=curr_hr, spo2=curr_spo2, 
+                bp_sys=curr_sys, bp_dia=curr_dia,
+                temp=curr_temp, resp_rate=curr_rr, gsr=curr_gsr,
+                location=curr_loc, crowd_labels=crowd_labels, shock=curr_shock
+            )
+            
+            yield state, self.t

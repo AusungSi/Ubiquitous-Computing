@@ -1,55 +1,56 @@
+# core/decision.py
+from config import BASE_SCORE, CONTEXT_WEIGHTS, HYSTERESIS_UP, HYSTERESIS_DOWN, VITAL_RANGES
+
 class CareDecision:
-    """
-    ACAS 2.0 决策层
-    特性：上下文感知 (Context-Aware) 的自适应线性评分模型
-    """
-    def __init__(self, base_score=85):
-        self.base_score = base_score
+    def __init__(self):
         self.current_level = "L3"
-
-    def calculate_total_score(self, q_val, entropy_penalty, shock_signal, spo2_val, location):
-        """
-        增强版线性公式：
-        H_score = S_base - (w1*Shock) - (w2*Entropy) - (w3*Crowd) - (w4*SpO2_Loss)
-        其中 w 参数根据 location 动态调整
-        """
-        # 1. 默认权重
-        w_shock = 20.0
-        w_entropy = 1.0 # entropy_penalty 内部已经乘过系数，这里保持1
-        w_crowd = 15.0  # 基于置信度的扣分
         
-        # 2. 上下文感知：权重自适应调整 (Context Adaptation)
-        if location == "Park":
-            # 场景：在公园运动
-            # 策略：调低熵的敏感度（允许心率波动），忽略轻微冲击
-            w_entropy = 0.3 
-            w_shock = 10.0 
+    def evaluate(self, state, trust_conf, entropy_penalty):
+        # 1. 获取基础权重
+        w = CONTEXT_WEIGHTS.get(state.location, CONTEXT_WEIGHTS["Bedroom"])
         
-        elif location == "Bathroom":
-            # 场景：在浴室
-            # 策略：跌倒极其危险，大幅提升冲击权重
-            w_shock = 40.0 
+        # 2. 计算各维度罚分 (Loss Calculation)
+        
+        # [A] 冲击与熵 (原有)
+        loss_shock = w["w_shock"] * state.shock
+        loss_entropy = entropy_penalty * w["w_entropy"]
+        
+        # [B] 群智 (原有)
+        loss_crowd = w["w_crowd"] * (1.0 - trust_conf)
+        
+        # [C] 关键生理指标罚分 (新增)
+        loss_vital = 0.0
+        
+        # C1. 血氧 (低于95开始扣分，低于90重罚)
+        if state.spo2 < VITAL_RANGES["spo2_min"]:
+            loss_vital += (VITAL_RANGES["spo2_min"] - state.spo2) * 3.0
             
-        # 3. 计算各分项扣分
-        loss_shock = w_shock * shock_signal
-        loss_entropy = w_entropy * entropy_penalty
-        loss_crowd = w_crowd * (1.0 - q_val) # 置信度越低(风险越大)，扣分越多
-        
-        # 新增：血氧扣分 (非线性急剧扣分)
-        loss_spo2 = 0
-        if spo2_val < 95:
-            loss_spo2 = (95 - spo2_val) * 2.5 # 每低1%扣2.5分
+        # C2. 血压 (非线性: 仅针对高危的高压>160 或 低压<90/60)
+        # 休克判定 (高压 < 90)
+        if state.bp_sys < VITAL_RANGES["bp_sys_min"]: 
+            loss_vital += (VITAL_RANGES["bp_sys_min"] - state.bp_sys) * 2.0
+        # 高血压危象 (高压 > 160)
+        elif state.bp_sys > 160: 
+            loss_vital += (state.bp_sys - 160) * 1.0
             
-        # 4. 总分计算
-        total_loss = loss_shock + loss_entropy + loss_crowd + loss_spo2
-        score = self.base_score - total_loss
+        # C3. 皮肤电 (GSR) - 疼痛/压力指示器
+        # 只有在 GSR 显著高于基线时扣分
+        if state.gsr > VITAL_RANGES["gsr_baseline"] * 2:
+            loss_vital += (state.gsr - VITAL_RANGES["gsr_baseline"]) * 1.5
+            
+        # C4. 体温 (发烧仅轻微扣分，除非极高)
+        if state.temp > 38.0:
+            loss_vital += (state.temp - 38.0) * 5.0
+            
+        # 3. 总分
+        total_loss = loss_shock + loss_entropy + loss_crowd + loss_vital
+        score = max(0, min(100, state.base_score - total_loss))
         
-        return max(0, min(100, score))
-
-    def apply_hysteresis(self, score):
-        # 迟滞比较器保持不变
+        # 4. 迟滞比较器状态机
+        old_level = self.current_level
         if self.current_level == "L3":
-            if score < 60: self.current_level = "L4"
+            if score < HYSTERESIS_DOWN: self.current_level = "L4"
         elif self.current_level == "L4":
-            if score > 65: self.current_level = "L3"
-        return self.current_level
+            if score > HYSTERESIS_UP: self.current_level = "L3"
+            
+        return score, self.current_level, (old_level != self.current_level)

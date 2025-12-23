@@ -1,34 +1,41 @@
+# core/stability.py
 import numpy as np
+from collections import deque
+from config import ENTROPY_THRESHOLD, ENTROPY_PENALTY_COEF, WINDOW_SIZE
 
 class StabilityAnalyzer:
     """
-    2.3 状态评估层：基于信息熵的稳定性量化
+    基于信息熵的时序稳定性分析
+    对应文档：2.4 基于信息熵的时序稳定性分析
     """
-    def __init__(self, threshold=1.5, delta=10):
-        self.h_th = threshold
-        self.delta = delta
+    def __init__(self, threshold=ENTROPY_THRESHOLD):
+        self.window = deque(maxlen=WINDOW_SIZE)
+        self.threshold = threshold
 
-    def compute_shannon_entropy(self, data_window):
+    def update_and_calculate(self, new_value):
         """
-        计算时间窗口内的香农熵
+        更新窗口并计算熵值
         """
-        if len(data_window) < 2: 
-            return 0.0
+        self.window.append(new_value)
         
-        # 1. 离散化 (Discretization)
-        # 将连续的心率值映射到直方图 bin 中
-        hist, _ = np.histogram(data_window, bins=10, range=(40, 140), density=True)
+        if len(self.window) < 5:
+            return 0.0, 0.0 # 数据不足，不计算
+            
+        # 1. 动态离散化 (Dynamic Binning)
+        # 捕捉微小波动，而不是使用固定的全局 bin
+        d_min, d_max = min(self.window), max(self.window)
+        if d_max == d_min: return 0.0, 0.0
         
-        # 2. 计算熵
-        # H(Z) = - sum p(z) log2 p(z)
-        hist = hist[hist > 0] # 移除0值
-        entropy = -np.sum(hist * np.log2(hist))
+        # 将数据分为 5 个区间计算分布
+        hist, _ = np.histogram(self.window, bins=5, density=True)
+        probs = hist / np.sum(hist)
+        probs = probs[probs > 0] # 去除 0 值
         
-        return entropy
-
-    def calculate_penalty(self, entropy):
-        """
-        计算稳定性罚分
-        """
-        excess_entropy = max(0, entropy - self.h_th)
-        return self.delta * excess_entropy
+        # 2. 香农熵计算
+        entropy = -np.sum(probs * np.log2(probs))
+        
+        # 3. 罚分计算
+        excess = max(0, entropy - self.threshold)
+        penalty = excess * ENTROPY_PENALTY_COEF
+        
+        return entropy, penalty

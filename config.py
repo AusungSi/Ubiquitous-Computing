@@ -1,24 +1,40 @@
-# ==========================================
-# 系统全局配置文件
-# ==========================================
+# config.py
 
-# 1. 仿真设置
-SIMULATION_DURATION = 100  # 仿真总时长 (单位：步长)
-WINDOW_SIZE = 10           # 滑动窗口大小
+# --- 仿真设置 ---
+SIMULATION_FREQ = 1.0
+WINDOW_SIZE = 10
 
-# 2. 评分模型参数 (System Model)
-BASE_HEALTH_SCORE = 85.0   # 基础健康分 (S_base)
-ALPHA = 0.5                # 传感器冲击系数 (预留)
-BETA = 20.0                # 群智反馈权重
-DELTA = 15.0               # 熵值惩罚系数
+# --- 2.1 隐私参数 ---
+DEFAULT_K = 5
+BASE_BLUR_RADIUS = 0.0001
 
-# 3. 算法阈值
-KL_SENSITIVITY = 2.0       # KL散度敏感系数 (Lambda)
-ENTROPY_THRESHOLD = 1.8    # 健康熵阈值 (H_th)
+# --- 2.2 真值发现参数 ---
+KL_SENSITIVITY = 2.0
+DEFAULT_TRUST = 0.5
 
-# 4. 迟滞比较器阈值 (Hysteresis)
-LEVEL_UP_THRESHOLD = 60.0  # 降级阈值 (L3 -> L4, 分数过低)
-LEVEL_DOWN_THRESHOLD = 65.0 # 升级阈值 (L4 -> L3, 分数恢复)
+# --- 2.3 稳定性参数 ---
+ENTROPY_THRESHOLD = 1.5
+ENTROPY_PENALTY_COEF = 15.0
 
-# 5. 隐私参数
-K_ANONYMITY_VAL = 5        # K-匿名参数
+# --- 2.4 决策模型参数 (2.0 全维升级版) ---
+BASE_SCORE = 95.0       # 基础分提高，给扣分留出空间
+HYSTERESIS_UP = 75.0    # 严格的恢复标准
+HYSTERESIS_DOWN = 65.0  # 报警触发线
+
+# 上下文权重 (Context-Aware Weights)
+# 结构: [Shock, Entropy, Crowd] (传感器单独计算罚分)
+CONTEXT_WEIGHTS = {
+    "Bedroom":  {"w_shock": 20.0, "w_entropy": 1.0, "w_crowd": 20.0},
+    "Bathroom": {"w_shock": 50.0, "w_entropy": 1.2, "w_crowd": 15.0}, # 浴室跌倒权重极高
+    "LivingRoom": {"w_shock": 30.0, "w_entropy": 0.8, "w_crowd": 20.0},
+}
+
+# 生理指标正常范围 (用于计算罚分)
+VITAL_RANGES = {
+    "spo2_min": 95.0,
+    "bp_sys_max": 140.0, "bp_sys_min": 90.0,
+    "bp_dia_max": 90.0,  "bp_dia_min": 60.0,
+    "temp_max": 37.5,    "temp_min": 36.0,
+    "rr_max": 20.0,      "rr_min": 12.0,
+    "gsr_baseline": 5.0  # 皮肤电基线
+}
