@@ -35,3 +35,25 @@ class Elderly:
         self.diseases = chronic_diseases
         # 简单计算基准分
         self.base_score = 90 - (len(chronic_diseases) * 5)
+
+class UserProfile:
+    """
+    用户健康画像 (权威基准 D_prof)
+    """
+    def __init__(self, name, age, condition, base_score_override=None):
+        self.name = name
+        self.age = age
+        self.condition = condition # 健康/高血压/阿兹海默
+        
+        # 根据画像设定基准分 S_base
+        if base_score_override:
+            self.base_score = base_score_override
+        else:
+            if condition == "Healthy":
+                self.base_score = 95.0
+            elif condition == "Hypertension":
+                self.base_score = 85.0 # 起评分低
+            elif condition == "Alzheimer":
+                self.base_score = 80.0
+            else:
+                self.base_score = 90.0

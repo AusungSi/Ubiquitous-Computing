@@ -16,7 +16,6 @@ class TruthDiscovery:
         将连续传感器数值映射为概率分布 P(x)
         逻辑：利用高斯分布思想，偏离正常值越远，风险概率越高
         """
-        # 简单的高斯模拟逻辑
         if 60 <= hr_val <= 100:
             return np.array([0.90, 0.08, 0.02]) # 正常
         elif 50 < hr_val < 60 or 100 < hr_val < 120:
@@ -32,22 +31,41 @@ class TruthDiscovery:
         for l in labels:
             if l in counts: counts[l] += 1
         
-        # 拉普拉斯平滑 (Add-one smoothing) 防止概率为0
+        # 拉普拉斯平滑
         raw = np.array([counts[s] + 0.1 for s in self.states])
         return raw / np.sum(raw)
 
     def compute_trust_score(self, sensor_val, crowd_labels):
         """
-        计算 KL 散度及最终置信度
+        [旧接口] 使用标签列表计算
         """
         P = self._sensor_to_prob(sensor_val)
         Q = self._crowd_to_prob(crowd_labels)
         
-        # 计算 KL 散度: D_KL(P||Q)
+        epsilon = 1e-9
+        kl_value = np.sum(P * np.log((P + epsilon) / (Q + epsilon)))
+        confidence = 1.0 / (1.0 + self.lambda_param * kl_value)
+        
+        return confidence, kl_value
+
+    # ==========================================
+    # 👇 必须补上这个新方法 👇
+    # ==========================================
+    def compute_trust_with_distribution(self, sensor_val, Q_distribution):
+        """
+        [新接口] 直接使用 BERT/NLP 输出的概率分布 Q 计算 KL 散度
+        """
+        # 1. 获取传感器分布 P
+        P = self._sensor_to_prob(sensor_val)
+        
+        # 2. 获取传入的 NLP 分布 Q
+        Q = Q_distribution
+        
+        # 3. 计算 KL 散度
         epsilon = 1e-9
         kl_value = np.sum(P * np.log((P + epsilon) / (Q + epsilon)))
         
-        # 映射公式: Conf = 1 / (1 + lambda * KL)
+        # 4. 计算置信度
         confidence = 1.0 / (1.0 + self.lambda_param * kl_value)
         
         return confidence, kl_value
