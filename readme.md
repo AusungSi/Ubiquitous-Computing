@@ -61,15 +61,13 @@
    ```bash
    git clone [https://github.com/your-username/ACAS-Sim.git](https://github.com/your-username/ACAS-Sim.git)
    cd ACAS-Sim
-安装依赖
+### 安装依赖
 
-Bash
-
+```bash
 pip install -r requirements.txt
 requirements.txt 内容参考: streamlit, pandas, numpy, plotly, pydeck, torch, transformers
 
 运行系统
-
 Bash
 
 streamlit run app.py
