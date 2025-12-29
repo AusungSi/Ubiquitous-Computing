@@ -1,4 +1,3 @@
-```markdown
 # 🛡️ ACAS-Sim: 面向移动群智感知的智慧社区养老自适应照护评估系统
 
 > **Adaptive Care Assessment System (ACAS 2.0)**
@@ -124,7 +123,5 @@ ACAS-Sim/
 **Author:** [lyt[
 
 **Institution:** Nanjing University of Aeronautics and Astronautics (NUAA)
-
-```
 
 ```
