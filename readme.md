@@ -1,105 +1,27 @@
-## 项目简介
-Ubiquitous-Computing 旨在为常驻计算与上下文感知领域提供一套开箱即用的 Python 工具、示例和研究代码。它适合用于数据采集、传感器数据预处理、特征工程、模型训练/评估以及实验记录与复现。
+🛡️ ACAS-Sim: 面向移动群智感知的智慧社区养老自适应照护评估系统Adaptive Care Assessment System (ACAS 2.0) > 基于普适计算 (Pervasive Computing) 与人机物融合的智慧养老数字孪生仿真平台。📖 项目简介 (Introduction)随着老龄化社会的加剧，独居老人的健康安全监测面临巨大挑战。传统的单一传感器监测往往存在误报率高、语义理解能力弱的问题。ACAS-Sim 是一个集成了多模态生理感知、AI 语义认知与动态隐私保护的仿真系统。它构建了一个“人-机-物”融合的四维全息感知模型，旨在通过群智感知（Crowdsensing）技术解决多源异构数据的冲突处理与隐私泄露难题。本系统不仅模拟了心率、血压、皮肤电等全维生命体征，还引入了 BERT 模型 处理非结构化的志愿者反馈与老人语音自述，实现了真正的认知智能。✨ 核心特性 (Key Features)1. 🧬 全维生命体征数字孪生模拟真实的生理信号发生器，支持多种医学与生活场景：基础指标：心率 (HR)、血氧 (SpO2)、呼吸率 (RR)、体温 (Temp)。高级指标：收缩压/舒张压 (BP)（关联休克检测）、皮肤电反应 (GSR)（关联痛感与惊吓）。情境模拟：支持 正常、心律失常、浴室跌倒、高强度运动（抗误报测试）、夜间低血糖、急性心梗 等六大场景。2. 🧠 BERT 驱动的语义认知 ($D_{crowd}$ & $D_{self}$)告别死板的关键词匹配，利用 Zero-Shot Classification (Transformer) 实现真正的语义理解：志愿者反馈：将自然语言（如 "He is stumbling"）自动映射为风险概率分布 $Q(x)$。老人自述：对语音转写的文本进行紧急程度量化，动态计算罚分或触发高优中断。3. 🛡️ 下一代隐私保护策略 (Privacy 2.0)K-匿名位置泛化：基于地理围栏的动态 K 值模糊。任务导向的语义置换 (Semantic Transformation)：L3 日常模式：隐藏具体病名（如“糖尿病”），仅输出照护指令（如“需防低血糖”），实现信息零损失的同时保护隐私。L4 紧急模式：基于 Break-glass 机制，生命优先，自动降级隐私保护以辅助急救。4. ⚖️ 鲁棒的决策算法真值发现：基于 KL 散度 (Kullback-Leibler Divergence) 计算传感器分布 $P(x)$ 与志愿者分布 $Q(x)$ 的一致性，自动过滤虚假情报。稳定性分析：引入 信息熵 (Shannon Entropy) 监测生理时序数据的混乱度，敏锐捕捉亚健康波动。迟滞决策：双阈值状态机，有效防止因数据噪点导致的报警震荡。🏗️ 系统架构 (Architecture)本系统基于 四维全息感知模型 构建：权威基准 ($D_{prof}$): 基于 EHR (电子健康档案) 的动态用户画像 (UserProfile)。客观真值 ($D_{sensor}$): IoT 设备生成的多维概率分布。主观语义 ($D_{crowd}$): BERT 解析的志愿者观测分布。高优中断 ($D_{self}$): SOS 按键与 NLP 语音分析的最高优先级触发。🚀 快速开始 (Getting Started)环境要求Python 3.8+PyTorch (建议 GPU 版本，CPU 亦可)安装步骤克隆仓库Bashgit clone https://github.com/your-username/ACAS-Sim.git
+cd ACAS-Sim
+安装依赖Bashpip install -r requirements.txt
+requirements.txt 内容参考: streamlit, pandas, numpy, plotly, pydeck, torch, transformers运行系统Bashstreamlit run app.py
+⚠️ 注意事项 (Hugging Face 模型)首次运行时，系统会自动下载 valhalla/distilbart-mnli-12-1 模型（约 1GB）。如果遇到下载网络错误，请在终端设置国内镜像：Bash# Linux / Mac
+export HF_ENDPOINT=https://hf-mirror.com
 
-这个仓库包含：
-- 可复现的数据处理与建模管道
-- 通用的传感器/上下文抽象与工具
-- 示例脚本与 Jupyter notebooks，便于快速上手与演示
-- 测试套件与 CI 配置（如有）
+# Windows PowerShell
+$env:HF_ENDPOINT = "https://hf-mirror.com"
+📂 目录结构 (Directory Structure)PlaintextACAS-Sim/
+├── app.py                  # 系统入口 (Streamlit UI 主逻辑)
+├── config.py               # 全局参数配置文件 (阈值、权重)
+├── core/                   # 核心算法层
+│   ├── decision.py         # 决策与迟滞比较器
+│   ├── nlp_bert.py         # BERT 语义认知引擎
+│   ├── privacy.py          # K-匿名与隐私语义置换
+│   ├── stability.py        # 信息熵稳定性分析
+│   └── truth_discovery.py  # KL 散度真值发现
+├── simulation/             # 仿真层
+│   ├── actors.py           # 数据模型 (UserProfile, HolographicState)
+│   └── generator.py        # 多模态生理数据生成器
+└── requirements.txt        # 依赖列表
+📸 演示截图 (Screenshots)
+<img width="1919" height="910" alt="b957263d4a6b0781acca22ad692a9cab" src="https://github.com/user-attachments/assets/f144313c-df69-499a-8584-1cc2c0c1f6fa" />
+<img width="901" height="555" alt="8317dc317f91877e6946030ab95c762a" src="https://github.com/user-attachments/assets/4b09a6be-3bfd-41d2-9059-ad01570fb1e7" />
 
-> 语言组成：100% Python
-
-## 主要特性
-- 传感器数据导入与同步模块（示例）
-- 面向研究的实验配置与复现脚本（示例）
-- 常用特征提取函数集合
-- 可扩展的训练/评估流水线（支持自定义模型）
-- 示例 notebooks，展示端到端流程
-
-## 仓库结构（示例）
-请根据实际仓库内容更新下列目录说明。
-
-- README.md                     — 项目说明（本文件）
-- requirements.txt              — Python 依赖（如果存在）
-- pyproject.toml / setup.py      — 包信息（如果这是一个可安装包）
-- src/ 或 ubiq_computing/       — 项目源码
-- data/                         — 原始 / 示例数据（通常不提交大文件）
-- notebooks/                     — Jupyter 笔记本示例
-- examples/                      — 使用示例脚本（run_examples.py 等）
-- tests/                         — 自动化测试
-- docs/                          — 项目文档（可选）
-- .github/workflows/             — CI 配置（可选）
-
-## 快速开始
-
-下面给出通用的快速启动步骤。根据仓库实际情况调整命令与路径。
-
-1. 克隆仓库
-```bash
-git clone https://github.com/AusungSi/Ubiquitous-Computing.git
-cd Ubiquitous-Computing
-```
-
-2. 创建虚拟环境并安装依赖（推荐）
-```bash
-python -m venv .venv
-source .venv/bin/activate    # macOS / Linux
-# .venv\Scripts\activate     # Windows PowerShell
-
-pip install --upgrade pip
-# 如果有 requirements.txt：
-pip install -r requirements.txt
-# 或者使用 pyproject.toml / poetry / pipenv 等工具：
-# pip install .
-```
-
-3. 运行示例（假设仓库有 examples/run_example.py）
-```bash
-python examples/run_example.py
-```
-
-4. 在 Jupyter Notebook 中打开 examples / notebooks：
-```bash
-jupyter notebook notebooks/
-```
-
-## 配置与使用说明（示例）
-- 配置文件通常放在 `configs/` 或 `config.yaml`，用于设置数据路径、实验超参、模型保存路径等。
-- 数据通常放在 `data/raw/`，处理后的数据放在 `data/processed/`。
-- 模型与中间产物建议放在 `artifacts/` 或 `outputs/`，并加入 `.gitignore`。
-
-## 开发与贡献
-欢迎贡献！常见贡献方式：
-1. 提交 issue 提出 bug 或新功能建议
-2. Fork 本仓库，创建 feature 分支，完成实现并提交 PR
-3. 在 PR 中包含说明、测试与示例（必要时）
-
-贡献指南（示例）
-- 遵循常用的代码风格（PEP8）
-- 为新增的功能添加单元测试（放在 tests/）
-- 在 PR 描述中阐述变更理由与测试方法
-
-如果你要长期协作，建议在仓库中添加 `CONTRIBUTING.md` 来具体说明流程。
-
-## 测试
-如果仓库包含测试，可按以下方式运行：
-```bash
-# 使用 pytest（如果项目使用 pytest）
-pytest -q
-```
-如启用 CI（GitHub Actions 等），请查看 `.github/workflows/` 下的配置以了解自动化流程。
-
-## 常见问题（FAQ）
-- 我没有 data 文件夹，如何开始？
-  - 仓库通常不包含大数据集。请根据 README 中的数据来源说明下载数据并放置在 `data/` 下，或联系项目维护者获取示例小数据集。
-- 怎样添加新传感器的数据解析模块？
-  - 在 `src/` 下新增 parser/ 或 readers/ 模块，遵循现有接口（如果有）并添加示例与测试。
-
-## 致谢
-感谢所有贡献者与使用者。若借鉴或复用了他人的数据集、代码或论文，请在项目文档中注明来源并遵守相应许可协议。
-
-## 引用
-如果您在论文或项目中使用本仓库，请在论文中引用本仓库，并在 README 更新具体引用格式（例如 BibTeX）。
-
-## 许可证
-当前仓库未在此处指定许可证（请在仓库根目录添加 LICENSE 文件）。如果不确定，建议选择合适的开源许可证，例如 MIT、Apache-2.0 等，并在此处说明。
+🤝 贡献与致谢本项目是普适计算课程设计成果。核心算法参考了群智感知、差分隐私与情感计算领域的相关研究。Author: [鲁贇涛]Institution: Nanjing University of Aeronautics and Astronautics (NUAA)
